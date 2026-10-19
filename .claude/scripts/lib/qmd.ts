@@ -25,11 +25,9 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { createRequire } from "node:module";
 import { dirname, isAbsolute, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { debug } from "./hook-io.ts";
-
-const require = createRequire(import.meta.url);
 
 /**
  * Locate @tobilu/qmd's real JS entrypoint. Returns an absolute path when
@@ -89,8 +87,20 @@ export function isRunnableQmdEntry(entry: string): boolean {
 }
 
 function localQmdEntry(): string | null {
+	// @tobilu/qmd's package.json "exports" map declares only "." (the library
+	// entry), so a subpath require.resolve("@tobilu/qmd/dist/cli/qmd.js")
+	// throws ERR_PACKAGE_PATH_NOT_EXPORTED even though the CLI file exists on
+	// disk — Node enforces "exports" before the file system is consulted.
+	// Resolve the declared "." entry instead (reachable because it's ESM-only,
+	// so import.meta.resolve, not require.resolve), then derive the package
+	// root by walking up from it (dist/index.js -> dist -> root) and join the
+	// CLI path by hand, bypassing the exports map for a path we already know
+	// is real in every published layout.
 	try {
-		return require.resolve("@tobilu/qmd/dist/cli/qmd.js");
+		const mainEntry = import.meta.resolve("@tobilu/qmd");
+		const pkgRoot = dirname(dirname(fileURLToPath(mainEntry)));
+		const entry = join(pkgRoot, "dist", "cli", "qmd.js");
+		return existsSync(entry) ? entry : null;
 	} catch {
 		return null;
 	}

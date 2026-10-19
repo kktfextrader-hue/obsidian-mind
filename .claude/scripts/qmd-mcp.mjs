@@ -29,11 +29,8 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { homedir } from "node:os";
-
-const require = createRequire(import.meta.url);
 
 /**
  * Resolve the wrapper's vault root from a `file://` URL and optional env
@@ -119,8 +116,19 @@ export function isRunnableQmdEntry(entry) {
 }
 
 function localQmdEntry() {
+	// @tobilu/qmd's package.json "exports" map declares only "." (the library
+	// entry), so a subpath require.resolve("@tobilu/qmd/dist/cli/qmd.js")
+	// throws ERR_PACKAGE_PATH_NOT_EXPORTED even though the CLI file exists on
+	// disk. Resolve the declared "." entry via import.meta.resolve (reachable
+	// since the package is ESM-only), derive the package root by walking up
+	// from it, and join the CLI path by hand — bypassing the exports map for a
+	// path known to be real in every published layout. Kept in step with
+	// lib/qmd.ts's localQmdEntry by hand (see file header).
 	try {
-		return require.resolve("@tobilu/qmd/dist/cli/qmd.js");
+		const mainEntry = import.meta.resolve("@tobilu/qmd");
+		const pkgRoot = dirname(dirname(fileURLToPath(mainEntry)));
+		const entry = join(pkgRoot, "dist", "cli", "qmd.js");
+		return existsSync(entry) ? entry : null;
 	} catch {
 		return null;
 	}
