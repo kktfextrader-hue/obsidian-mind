@@ -19,7 +19,7 @@ Incident docs live in `work/incidents/`. See `Incidents.base` for overview.
 
 ## Active Projects
 
--
+- [[thaisubtitle 14B QLoRA training]] — Colab L4 1-epoch run, repeatedly interrupted before first checkpoint
 
 ## Review Prep
 
